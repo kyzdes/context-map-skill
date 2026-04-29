@@ -23,12 +23,13 @@ Before scanning or editing, send a short note. This is a conversation example wr
 ```text
 Я создам папку `context-map-<slug>/` в корне проекта с набором файлов: `context-map.md` (главный), `known-issues.md`, `decisions.md`, `tasks.md`, `gotchas.md` (и `architecture.md` для средних+ проектов). Это оперативная память проекта для будущих AI-агентов на английском языке.
 
-Дополнительно могу:
-- добавить правило в `CLAUDE.md` / `AGENTS.md`, чтобы агенты всегда читали эту папку перед работой;
-- добавить универсальное правило в `~/.claude/CLAUDE.md` для всех твоих проектов (опционально);
-- добавить `context-map-*/` в `.gitignore`, если репозиторий публичный.
+Я также автоматически добавлю `context-map-*/` в `.gitignore` проекта — карта это приватная память агента, не source code, и не должна попадать в публичные репозитории.
 
-Ничего из этого не сделаю без подтверждения. Сейчас просканирую проект.
+Дополнительно могу (с подтверждением):
+- добавить правило в `CLAUDE.md` / `AGENTS.md`, чтобы агенты всегда читали эту папку перед работой;
+- один раз поставить универсальное правило в `~/.claude/CLAUDE.md` и в твой глобальный git excludes (`~/.config/git/ignore`), чтобы любой репо на машине игнорил карты автоматически.
+
+Сейчас просканирую проект.
 ```
 
 Then proceed to inspection. Do not wait for setup answers unless the user asked to decide them first.
@@ -115,6 +116,7 @@ Write (or refresh) this stanza into the selected project agent file, between mar
 - If a requested change conflicts with a Known Issue or Decision, explain the conflict and ask the user before proceeding.
 - Update the context map when entry points, architecture, deploy flow, run/test commands, DB schema, auth, payments, or external integrations change; when a significant decision is made or reversed; when a known issue is discovered, fixed, or accepted; when a fix prevents a future regression.
 - Do not put secrets, tokens, passwords, or private credentials in the context map.
+- Never commit `context-map-<slug>/` content. The skill ensures `.gitignore` excludes it; if you find this folder being staged, remove it from the index and verify the project's `.gitignore` carries the rule.
 
 <!-- end context-map skill section -->
 ```
@@ -145,36 +147,54 @@ Only on explicit approval, write this stanza (same marker discipline):
 
 - When opening any project, check its root for a folder matching `context-map-*/`. If present, read `context-map.md` inside it before planning or editing.
 - Treat `known-issues.md`, `decisions.md`, and `tasks.md` inside that folder as project memory. Flag conflicts before implementing changes that contradict them.
+- Never commit `context-map-*/` content. It is project memory and may contain private operational notes; treat it like `.env`. If a `git add` would include it, stop and add the path to `.gitignore` instead.
 
 <!-- end context-map skill section -->
 ```
 
 This is a one-time, idempotent addition. Subsequent runs against the same global file detect the marker and skip unless the stanza content itself changed.
 
-## Repository Visibility Guidance
+## Repository Visibility And Gitignore Policy
 
-Default recommendation:
+Context-map content is project memory, not source code. Treat it like `.env`: it can carry private operational notes, decisions, gotchas. The default policy is **always gitignored**, applied at three layers:
 
-- **Private / internal repo**: commit `context-map-<slug>/`. It is shared project memory.
-- **Public / open-source repo**: ask whether to keep the folder private. If yes, add `context-map-*/` to `.gitignore`.
-- **Unknown visibility**: ask before adding `.gitignore` changes.
+1. **Project `.gitignore`** — added by the skill on every first run. Visible to collaborators and CI. Always-on; no question asked.
+2. **Global git excludes** — `~/.config/git/ignore` (or whatever `core.excludesfile` points to). Belt-and-suspenders for repos that don't have a local `.gitignore` rule yet. Offered once per machine; persisted via a managed marker so subsequent runs are no-ops.
+3. **Agent rule in `~/.claude/CLAUDE.md`** — global stanza that tells any agent (with or without this skill loaded) never to commit `context-map-*/`. See "Optional: Global Stanza" below.
 
-Do not assume visibility from a remote URL alone.
+### Per-project install
 
-### .gitignore Snippet
+Always run, on every first generate/update:
 
-Use only with user approval:
-
-```gitignore
-# AI agent local project memory
-context-map-*/
+```bash
+python3 scripts/ensure_gitignore.py --scope project --project /path/to/project
 ```
 
-If the user wants to keep a committed shared folder while still having personal local overrides, a `*.local.md` convention inside the folder is available:
+The script is idempotent; it adds a managed block delimited by `# managed by context-map skill` markers so subsequent runs detect and skip. If the user already has a hand-written `context-map-*/` line, the script leaves the file alone.
+
+### Global install
+
+Offered once per machine, applied with explicit user approval:
+
+```bash
+python3 scripts/ensure_gitignore.py --scope global
+```
+
+The script resolves the global excludes path in the same order git itself uses (`core.excludesfile` → `$XDG_CONFIG_HOME/git/ignore` → `~/.config/git/ignore`), creates the file if missing, and — only when no existing `core.excludesfile` is configured — sets `git config --global core.excludesfile` to point at it. Once installed, every repo on this machine ignores `context-map-*/` automatically.
+
+### When the user wants to commit the folder
+
+Some teams want the map shared in-repo (e.g. internal monorepo with no public mirror). Honor it: skip both `.gitignore` and global rules, but still add the agent stanza so future agents know to read the folder. Document this choice in `decisions.md` so future agents know it was deliberate.
+
+### Local overrides convention
+
+For mixed setups (committed team map + personal local notes), the suffix `*.local.md` inside the folder is recognised:
 
 ```gitignore
 context-map-*/**/*.local.md
 ```
+
+This belongs to the user's choice, not the skill's defaults.
 
 ## First-Run Completion Message
 

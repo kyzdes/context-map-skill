@@ -93,7 +93,19 @@ python3 scripts/validate_context_map.py /path/to/project/context-map-<slug>
 ```
 
 10. If validation fails, fix the output before reporting success. Never claim completion with failing validation.
-11. If the requested work conflicts with a known issue or decision, stop before editing code and ask the user to confirm the change of direction. See `references/decision-format.md` → `Agent Conflict Protocol`.
+11. Ensure the generated folder is gitignored. The skill never lets context-map content leak into a repo's history — it is project memory, not source code, and may carry private operational notes:
+
+```bash
+# always: project-level rule (idempotent; touches only the project's .gitignore)
+python3 scripts/ensure_gitignore.py --scope project --project /path/to/project
+
+# once per machine (skill offers this on first ever run, then skips):
+python3 scripts/ensure_gitignore.py --scope global
+```
+
+The global rule writes to the user's git excludes file (resolved via `core.excludesfile` → `$XDG_CONFIG_HOME/git/ignore` → `~/.config/git/ignore`) so every repo on the machine ignores `context-map-*/` even if its local `.gitignore` is missing the rule.
+
+12. If the requested work conflicts with a known issue or decision, stop before editing code and ask the user to confirm the change of direction. See `references/decision-format.md` → `Agent Conflict Protocol`.
 
 ## Batch Workflow
 

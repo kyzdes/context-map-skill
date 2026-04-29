@@ -8,6 +8,7 @@ Run:
 
 ```bash
 python3 scripts/validate_context_map.py /path/to/project/context-map-<slug>
+python3 scripts/ensure_gitignore.py --scope project --project /path/to/project --check
 ```
 
 The validator checks:
@@ -21,7 +22,11 @@ The validator checks:
 - Dates are ISO `YYYY-MM-DD`.
 - `last_updated` and `last_verified_vs_code` are not in the future.
 
-Do not claim completion until the validator exits 0.
+Plus the gitignore guard:
+
+- Project `.gitignore` excludes `context-map-*/` (managed marker or hand-written line). `ensure_gitignore.py --scope project --project <root> --check` exits 0.
+
+Do not claim completion until both `validate_context_map.py` and `ensure_gitignore.py --check` pass.
 
 ## Content Checks (skill applies judgement)
 

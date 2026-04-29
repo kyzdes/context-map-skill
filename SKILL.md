@@ -105,7 +105,19 @@ python3 scripts/ensure_gitignore.py --scope global
 
 The global rule writes to the user's git excludes file (resolved via `core.excludesfile` → `$XDG_CONFIG_HOME/git/ignore` → `~/.config/git/ignore`) so every repo on the machine ignores `context-map-*/` even if its local `.gitignore` is missing the rule.
 
-12. If the requested work conflicts with a known issue or decision, stop before editing code and ask the user to confirm the change of direction. See `references/decision-format.md` → `Agent Conflict Protocol`.
+12. Ensure agents know to read the context map first. Two mirror-image scripts handle this:
+
+```bash
+# always: per-project agent stanza (CLAUDE.md or AGENTS.md in the project)
+python3 scripts/ensure_agent_rule.py --scope project --project /path/to/project
+
+# once per machine: global stanza in ~/.claude/CLAUDE.md
+python3 scripts/ensure_agent_rule.py --scope global
+```
+
+Both write a managed block delimited by `<!-- managed by context-map skill: BEGIN/END agent-rule -->` markers. Idempotent: re-running with unchanged content is a no-op; updating the stanza in this file (e.g. when the rule wording changes) replaces the block in place. Content outside the markers stays untouched. Always show the diff and ask before writing.
+
+13. If the requested work conflicts with a known issue or decision, stop before editing code and ask the user to confirm the change of direction. See `references/decision-format.md` → `Agent Conflict Protocol`.
 
 ## Batch Workflow
 

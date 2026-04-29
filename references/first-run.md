@@ -123,12 +123,22 @@ Write (or refresh) this stanza into the selected project agent file, between mar
 
 ### Idempotency
 
-- Search for the exact marker `<!-- managed by context-map skill` in the target file. If present, replace everything between it and `<!-- end context-map skill section -->` with the refreshed stanza; leave content outside the markers untouched.
-- If no marker exists but a `## Project Context Map` heading is already present (hand-written), show it as a diff against the proposed stanza and ask the user whether to replace, merge, or skip.
-- If no heading is present, append the stanza to the end of the file.
-- If no agent file exists at all, offer to create `CLAUDE.md` with just this stanza.
+Use the bundled script `scripts/ensure_agent_rule.py` instead of hand-editing — it manages the markers for you and refuses to clobber unrelated content:
 
-Always show the diff and wait for approval before writing. Never write silently. Use the `Edit` tool for changes.
+```bash
+python3 scripts/ensure_agent_rule.py --scope project --project /path/to/project
+```
+
+How it behaves:
+
+- If the markers `<!-- managed by context-map skill: BEGIN agent-rule -->` ... `<!-- managed by context-map skill: END agent-rule -->` are absent, the script appends the stanza at the end of the chosen file.
+- If the markers are present, the script replaces only the content between them. Identical content → no-op.
+- It auto-picks the target file: prefer existing `CLAUDE.md`, fall back to existing `AGENTS.md`, otherwise create `CLAUDE.md`. Override with `--file CLAUDE.md|AGENTS.md`.
+- It auto-detects the project slug from the single `context-map-*/` folder. Override with `--slug`.
+
+If a hand-written `## Project Context Map` heading already exists without markers, the script appends a separate managed block with markers. The user can manually delete the old hand-written section once they confirm the managed one is what they want.
+
+Always run `--dry-run` first to show the diff, then run for real once the user approves. Never write silently.
 
 ### Optional: Global Stanza in `~/.claude/CLAUDE.md`
 
@@ -138,7 +148,13 @@ After the per-project stanza is applied, ask separately:
 Добавить универсальное правило в `~/.claude/CLAUDE.md`, чтобы любой твой проект с папкой `context-map-*/` автоматически подхватывался агентом?
 ```
 
-Only on explicit approval, write this stanza (same marker discipline):
+Only on explicit approval, run:
+
+```bash
+python3 scripts/ensure_agent_rule.py --scope global
+```
+
+The global stanza looks like this (the script writes it for you between managed markers):
 
 ```markdown
 ## Project Context Maps (global rule)

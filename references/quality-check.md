@@ -26,7 +26,11 @@ Plus the gitignore guard:
 
 - Project `.gitignore` excludes `context-map-*/` (managed marker or hand-written line). `ensure_gitignore.py --scope project --project <root> --check` exits 0.
 
-Do not claim completion until both `validate_context_map.py` and `ensure_gitignore.py --check` pass.
+Plus the agent-rule guard:
+
+- Project agent file (`CLAUDE.md` or `AGENTS.md`) carries the "Project Context Map" managed block. `ensure_agent_rule.py --scope project --project <root> --check` exits 0.
+
+Do not claim completion until `validate_context_map.py`, `ensure_gitignore.py --check`, and `ensure_agent_rule.py --check` all pass.
 
 ## Content Checks (skill applies judgement)
 

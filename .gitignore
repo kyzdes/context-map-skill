@@ -4,6 +4,9 @@ __pycache__/
 *.pyc
 *.pyo
 
+# Local landing site — not part of the skill itself
+landing/
+
 # managed by context-map skill — do not edit between markers
 # context-map-<slug>/ folders are project memory for AI coding agents.
 # They are not source code and may contain private operational notes, decisions,

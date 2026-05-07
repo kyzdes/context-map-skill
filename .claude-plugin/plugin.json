@@ -1,0 +1,7 @@
+{
+  "name": "context-map",
+  "description": "Generate, update, audit, and conflict-check project context-map.md files for AI coding agents. Project memory that future agents can read after context reset.",
+  "author": {
+    "name": "kyzdes"
+  }
+}

@@ -172,7 +172,7 @@ def build_main(
 
     frontmatter_lines = [
         "---",
-        "context_map_version: 2",
+        "context_map_version: 3",
         f"project_id: {slug}",
         f"project_slug: {slug}",
         f'name: "{project_name}"',
@@ -182,9 +182,10 @@ def build_main(
         f"status: {legacy_frontmatter.get('status') or 'active'}",
         f"scale: {scale}",
         f"primary_stack: [{', '.join(stack) if stack else ''}]",
+        "nav_layer: null",
         f"last_updated: {TODAY}",
         f"last_verified_vs_code: {TODAY}",
-        "generator: context-map-skill/0.2",
+        "generator: context-map-skill/0.3",
         "---",
     ]
 

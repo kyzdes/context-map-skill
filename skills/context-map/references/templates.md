@@ -1,13 +1,15 @@
-# Context Map Templates
+# Context Map Templates (memory layer)
 
-All templates below define the content of individual files inside `context-map-<slug>/`. Column names, enums, and section headers are fixed by `references/schema.md` — do not deviate. Generated content is always English.
+All templates below define the content of individual files inside the **memory layer** `context-map-<slug>/`. Column names, enums, and section headers are fixed by `references/schema.md` — do not deviate. Generated content is always English.
+
+> **Navigation-layer templates live in separate files**: `map-template.md`, `domain-doc-template.md`, `cross-cutting-template.md`, `distributed-claude-md-template.md`. Domain docs belong to the navigation layer (`agent-docs/domains/*.md`); the memory tree no longer carries its own `domains/`.
 
 Pick the variant per file by project scale (see `references/schema.md` → `File Presence By Scale`). When a section is marked optional, include it only when the project has signal worth recording.
 
 ## Shared Rules
 
 - Every `context-map.md` starts with the YAML frontmatter from `references/schema.md`.
-- Split files (`known-issues.md`, `decisions.md`, `tasks.md`, `gotchas.md`, `architecture.md`, `domains/*.md`) do **not** carry frontmatter.
+- Split files (`known-issues.md`, `decisions.md`, `tasks.md`, `gotchas.md`, `architecture.md`) do **not** carry frontmatter.
 - One canonical top-level heading per split file; exactly one canonical table per split file (except `architecture.md`).
 - Relative links between files use the filename only, since they live in the same folder: `` [`known-issues.md`](known-issues.md) ``.
 
@@ -19,7 +21,7 @@ Pick the variant per file by project scale (see `references/schema.md` → `File
 
 ```md
 ---
-context_map_version: 2
+context_map_version: 3
 project_id: PROJECT-SLUG
 project_slug: PROJECT-SLUG
 name: "PROJECT"
@@ -31,7 +33,7 @@ scale: XS
 primary_stack: []
 last_updated: YYYY-MM-DD
 last_verified_vs_code: YYYY-MM-DD
-generator: context-map-skill/0.2
+generator: context-map-skill/0.3
 ---
 
 # Context Map: PROJECT
@@ -92,7 +94,7 @@ path/to/file  — purpose
 
 ```md
 ---
-context_map_version: 2
+context_map_version: 3
 project_id: PROJECT-SLUG
 project_slug: PROJECT-SLUG
 name: "PROJECT"
@@ -104,7 +106,7 @@ scale: S            # or M
 primary_stack: []
 last_updated: YYYY-MM-DD
 last_verified_vs_code: YYYY-MM-DD
-generator: context-map-skill/0.2
+generator: context-map-skill/0.3
 ---
 
 # Context Map: PROJECT
@@ -198,13 +200,13 @@ Same frontmatter (with `scale: L`) and same sections as M. Additionally include:
 - ...
 ```
 
-`architecture.md` is required. Large-domain content moves to `architecture.md` and/or `domains/*.md` so the root map stays a router, not an encyclopedia.
+`architecture.md` is required. Large operational content (flows, data model, API surface) moves into `architecture.md` so the root map stays a router. Per-domain navigation docs live in the **navigation layer** (`agent-docs/domains/*.md`), not here.
 
 ### XL
 
 ```md
 ---
-context_map_version: 2
+context_map_version: 3
 project_id: PLATFORM-SLUG
 project_slug: PLATFORM-SLUG
 name: "PLATFORM"
@@ -216,7 +218,7 @@ scale: XL
 primary_stack: []
 last_updated: YYYY-MM-DD
 last_verified_vs_code: YYYY-MM-DD
-generator: context-map-skill/0.2
+generator: context-map-skill/0.3
 ---
 
 # Context Map: PLATFORM
@@ -261,11 +263,7 @@ ascii map of surfaces and integrations
 - [`tasks.md`](tasks.md)
 - [`gotchas.md`](gotchas.md)
 - [`architecture.md`](architecture.md)
-- [`domains/frontend.md`](domains/frontend.md)
-- [`domains/backend.md`](domains/backend.md)
-- [`domains/mobile.md`](domains/mobile.md)
-- [`domains/deploy.md`](domains/deploy.md)
-- [`domains/integrations.md`](domains/integrations.md)
+- [`../agent-docs/MAP.md`](../agent-docs/MAP.md) — navigation index; per-domain docs live there (only when `nav_layer: agent-docs`)
 
 ## Agent Conflict Protocol
 
@@ -402,6 +400,6 @@ Omit subsections that don't apply; don't fabricate them.
 
 ---
 
-## `domains/*.md` (XL only)
+## Per-domain docs → navigation layer
 
-Each domain file follows the relevant subset of `architecture.md` scoped to its domain. One canonical `#` header, sections as needed. Cross-link to the root `context-map.md` and sibling domain files.
+The memory tree no longer carries `domains/*.md` (removed in schema v3). Per-domain deep docs live in the **navigation layer** at `agent-docs/domains/*.md`, generated from `references/domain-doc-template.md`. For L/XL projects the memory `context-map.md` routes domain navigation to `../agent-docs/MAP.md` via the `## Linked Files` cross-link; it does not duplicate domain content.

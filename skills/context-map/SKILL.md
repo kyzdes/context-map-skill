@@ -1,177 +1,153 @@
 ---
 name: context-map
-description: Generate, update, audit, and conflict-check project context maps for AI coding agents. Use when the user asks for a project context map, agent memory document, onboarding map, known issues/decisions log, or wants to preserve project decisions and gotchas for future AI development work.
+description: >
+  Build and maintain agent-facing project documentation in two linked layers: a
+  COMMITTED `agent-docs/` navigation tree (a MAP router + per-domain deep docs +
+  optional per-folder CLAUDE.md, so an agent reads only the slice it needs) and a
+  GITIGNORED `context-map-<slug>/` memory tree (decisions, known issues, gotchas,
+  tasks, Agent Conflict Protocol). Use when the user asks for a project context
+  map, agent memory document, onboarding map, known-issues/decisions log; OR when
+  a project is too big for an agent's context, agents get lost in the codebase,
+  docs don't fit / waste tokens loading the wrong files, or the user wants to
+  decompose / map / structure the project for AI, split docs by domain, set up
+  per-area CLAUDE.md, or add a CI gate that keeps the docs fresh. Triggers in
+  Russian too — "карта проекта", "память проекта для агента", "разложить проект",
+  "агенты теряются в коде", "слишком большой проект", "документация для агентов",
+  "decisions / known issues". Replaces the retired `agent-docs-architect` skill.
 metadata:
-  short-description: Create AI-agent project context maps
-  version: "0.2"
+  short-description: Two-layer agent docs — committed navigation + gitignored memory
+  version: "0.3"
 ---
 
 # Context Map
 
-Create or maintain a `context-map-<slug>/` folder at the project root: a compact operational map split across domain files that helps AI coding agents reorient after a context reset, find the right files, avoid repeated mistakes, and respect project history.
+This skill owns a project's entire agent-facing documentation as **two cross-linked layers**:
 
-A context map is not a README, PRD, or full architecture spec. It is project memory for future agents.
+- **Navigation layer — `agent-docs/` (committed).** A `MAP.md` router, per-domain deep docs, and `_meta/`. Answers *"where do I go, what reads what"*. Stable, shareable, and gated for freshness by CI.
+- **Memory layer — `context-map-<slug>/` (gitignored).** Decisions, known issues, gotchas, tasks. Answers *"what was decided, what's broken, what must I not repeat"*. Private operational notes — treated like `.env`, never committed.
+
+A context map is not a README, PRD, or full architecture spec. Together the two layers are project memory **and** navigation for future agents.
+
+## Two Layers, One Skill
+
+| | Navigation (`agent-docs/`) | Memory (`context-map-<slug>/`) |
+|---|---|---|
+| Git | **committed** | **gitignored** |
+| A fact goes here if… | it's **code structure** — domains, entry points, file routing, neighbors, "read me when" | it's **project history / operational truth** — decisions (D-###), known issues (KI-###), gotchas (G-###), tasks (T-###), current phase |
+| Freshness | CI gate (Policy C, ~99%) | SessionStart staleness notice + manual `update` |
+
+**Gray-zone rule:** a *structural* gotcha ("router order matters in `main.py`") → the domain doc's `## Gotchas`. A *historical/operational* gotcha ("port 5000 fails on macOS AirPlay; KI-001") → memory `gotchas.md` / `known-issues.md`. When unsure: does the agent need it to **navigate** (nav) or to **avoid a known landmine / respect a decision** (memory)?
+
+**Cross-link contract (bidirectional):**
+- `agent-docs/MAP.md` `## Project memory` → `../context-map-<slug>/context-map.md`.
+- memory `context-map.md` `## Linked Files` → `../agent-docs/MAP.md` (set `nav_layer: agent-docs` in frontmatter).
+- `agent-docs/_meta/links.json` records the machine-readable pairing.
+- Domain docs **cite** memory IDs (D/KI/G/T), never restate them.
+
+The full schema for **both** layers (layout, frontmatter, tables, enums, required sections, canonical domain-doc headers, `_meta/*.json` shapes) lives in `references/schema.md`. It is authoritative; if any other file disagrees, follow `schema.md` and fix the other file.
 
 ## Output Language
 
-All context-map files are generated in **English** regardless of session language. Conversation with the user stays in the session language. Preserve established non-English project names or domain terms only when translating would reduce precision; note that choice in `Confidence Notes`.
-
-The full schema (layout, frontmatter, table columns, enums, required sections) lives in `references/schema.md`. Treat it as authoritative; if any other file disagrees, follow `schema.md` and fix the other file.
+All generated files (both layers) are in **English** regardless of session language. Conversation stays in the session language. Preserve established non-English project names or domain terms when translating would reduce precision; note the choice in `Confidence Notes`.
 
 ## Modes
 
-- **generate**: create a new `context-map-<slug>/` folder.
-- **update**: refresh an existing map while preserving hand-written notes.
-- **audit**: review an existing map and report missing/stale sections, schema violations, and drift from code.
-- **conflict-check**: compare a requested change against `known-issues.md` and `decisions.md`, stop before editing code, and ask the user before violating project history.
-- **migrate-legacy**: convert an older single-file `context-map.md` / `docs/context-map.md` into the new folder layout via `scripts/migrate_legacy.py`.
-- **batch-discover**: find project candidates across one or more project roots.
-- **batch-plan**: show discovered projects and ask the user to select numbers/ranges before writing maps.
-- **batch-generate**: create or update context maps for selected projects, one project at a time.
-- **batch-index**: collect existing context maps into a dashboard-ready JSON index.
-- **dashboard-data**: prepare or refresh `~/.context-map/index.json` for a future local web UI.
+`update` and `audit` act on **both layers by default**. A domain argument (`update auth`) or `--layer nav` scopes to navigation; `--layer memory` scopes to memory. Never silently do only one layer when the user said just `update`.
 
-Infer the mode from the request. Default to `generate` when no map exists and `update` when one exists. If a legacy single-file map is detected, default to `migrate-legacy` and stop before touching code.
+- **generate** (alias **init**): bootstrap. Creates the memory tree always; the navigation tree at scale M+ (or on request). `--layer nav|memory|both`.
+- **update [<domain>]**: refresh. A domain arg ⇒ refresh that nav domain doc; `--layer memory` ⇒ refresh memory tables; bare ⇒ both. Preserves hand-written notes.
+- **audit**: report-only, both layers via `scripts/audit.py` (one report, two sections) — memory schema/drift (`validate_context_map.py`) + navigation structure/staleness (`lint_docs.py`). `--layer` scopes it.
+- **conflict-check**: compare a requested change against `known-issues.md` and `decisions.md`; stop before editing code and ask the user before violating project history.
+- **decompose**: navigation-only Discover + Decompose. Propose the domain list, no writes.
+- **add-domain `<name> <path>`**: insert one new nav domain; wire it into `MAP.md`, `_meta/`, and Neighbors.
+- **sustain** (alias **sustain-only**): wire maintenance for both layers without re-documenting — memory `.gitignore` + agent rule + SessionStart notice; navigation CI gate (Policy C) + optional Stop hook (Policy B).
+- **reconcile**: link an existing split/legacy layout (a project that already has `agent-docs/` and/or `context-map-<slug>/` and/or a legacy single-file map). Additive, zero data loss. See `references/reconcile.md`.
+- **migrate-legacy**: convert an older single-file `context-map.md` / `docs/context-map.md` into the folder layout via `scripts/migrate_legacy.py`.
+- **batch-discover / batch-plan / batch-generate / batch-index**: multi-project discovery and queued generation. `batch-generate` takes `--layer`.
+- **dashboard-data**: prepare/refresh `~/.context-map/index.json` (spans both layers) for the local web UI.
+
+Infer the mode. Default `generate` when nothing exists, `update` when a map exists, `reconcile` when both trees exist but are unlinked or use legacy markers, `migrate-legacy` when a legacy single-file map is detected (stop before touching code).
 
 ## First Run
 
-If no `context-map-*/` folder exists in the project, treat this as a first run and read `references/first-run.md` before making edits.
+If neither `context-map-*/` nor `agent-docs/` exists, treat this as a first run and read `references/first-run.md` before editing. On first run the skill:
 
-On first run the skill:
+1. Briefly explains, in the session language, that it will create agent-facing docs (which layers, and that memory is gitignored while navigation is committed).
+2. Scans for existing agent-config files (`CLAUDE.md`, `AGENTS.md`, `GEMINI.md`, `.cursor/rules/`, `.github/copilot-instructions.md`) and proposes a single unified "Project Docs" stanza in the most appropriate one, via `scripts/ensure_agent_rule.py` — always waiting for approval.
+3. Optionally offers a global rule in `~/.claude/CLAUDE.md` (explicit approval only).
+4. Offers `.gitignore` updates so the memory tree is ignored and the navigation tree stays committed.
 
-1. Briefly explains, in the session language, that it will create a project memory folder for future agents.
-2. Scans for existing agent-config files (`CLAUDE.md`, `AGENTS.md`, `GEMINI.md`, `.cursor/rules/`, `.github/copilot-instructions.md`) and proposes adding a "Project Context Map" stanza to the most appropriate one, always waiting for user approval (details in `references/first-run.md`).
-3. Optionally offers to add a generic rule to `~/.claude/CLAUDE.md` so every future project with a `context-map-*/` folder is read automatically. Only on explicit approval.
-4. Optionally offers `.gitignore` updates when the repo is public or visibility is unclear.
+Never modify `CLAUDE.md`, `AGENTS.md`, `.gitignore`, `settings.json`, or `~/.claude/CLAUDE.md` silently. Everything goes through a visible diff and explicit approval.
 
-Do not modify `CLAUDE.md`, `AGENTS.md`, `.gitignore`, or `~/.claude/CLAUDE.md` silently. Everything goes through a visible diff and explicit approval.
+## Scale ↔ Domains
 
-## Batch And Dashboard
-
-For batch requests, read `references/batch-workflow.md` and `references/dashboard-data.md`.
-
-Default config path:
-
-```text
-~/.context-map/config.json
-```
-
-Default dashboard index path:
-
-```text
-~/.context-map/index.json
-```
-
-Batch generation must show discovered project candidates and ask the user to choose projects before writing files. Do not deeply analyze many codebases in one context. Process selected projects as a queue and write durable progress after each project.
+Project scale (XS–XL) gates the memory files (see `references/schema.md` → `File Presence By Scale`) **and** whether/how big the navigation layer is. The full scale↔domain-count table and the "what is a domain / good-vs-bad signs" rules live in `references/heuristics.md` → `Domain Decomposition`. In short: navigation layer is opt-in below M, default at M+; expect 6–12 domains at M, 10–25 at L/XL; dispatch parallel writer subagents at ≥5 domains.
 
 ## Required Workflow
 
-1. Find the project root. Prefer the current working directory unless the user names a path.
-2. Read existing agent/project guidance first: `CLAUDE.md`, `AGENTS.md`, `GEMINI.md`, `.cursor/rules/`, `.github/copilot-instructions.md`, README, architecture docs, PRD, `decisions.md`, `known-issues.md`, ADRs, troubleshooting notes.
-3. If this is first run, follow `references/first-run.md`.
-4. Run the bundled inspector:
+The navigation layer adds a Discover→Decompose→Document→Sustain→Verify arc on top of the memory workflow. Combined:
 
-```bash
-python3 scripts/inspect_project.py /path/to/project --format json
-```
+1. **Find the project root.** Prefer cwd unless the user names a path.
+2. **Discover.** Read existing agent/project guidance (`CLAUDE.md`, `AGENTS.md`, `GEMINI.md`, `.cursor/rules/`, README, architecture docs, PRD, `decisions.md`, `known-issues.md`, ADRs). Run the inspector:
 
-JSON output includes git signals (recent commits, churn per directory) and doc-drift candidates, in addition to file/stack/scale data.
+   ```bash
+   python3 scripts/inspect_project.py /path/to/project --format json
+   ```
 
-5. Determine project scale using `references/heuristics.md`.
-6. Cross-check code against existing docs to build a confidence ledger (see `references/first-run.md` → `Context Collection Flow`):
-   - `verified`: present in code and mentioned in docs, consistent.
-   - `inferred`: present in code, not documented.
-   - `stale`: mentioned in docs, absent or changed in code.
-   - `conflicting`: docs disagree with each other.
-   - `duplicate`: same topic repeated in multiple docs with different detail.
-7. Load templates from `references/templates.md` and the schema from `references/schema.md`. Populate split files per scale.
-8. Always include `Known Issues`, `Decisions`, `Tasks / Next Work`, `Gotchas`, `Agent Conflict Protocol`, and `Confidence Notes` unless the user explicitly asks for a minimal XS scratch note.
-9. Validate the generated folder:
+   Output includes scale, git churn, doc-drift candidates, and a `domain_candidates` seed for the navigation layer. If first run, follow `references/first-run.md`.
+3. **Determine scale** using `references/heuristics.md`.
+4. **Cross-check code against docs** to build a confidence ledger (`references/first-run.md` → `Context Collection Flow`): `verified` / `inferred` / `stale` / `conflicting` / `duplicate`.
+5. **Decompose** (navigation, scale M+ or on request). From the inspector's `domain_candidates` + directory signals, propose a domain list (`name — root(s) — one-line responsibility`) and the cross-cutting concerns. Present it and accept the user's edits literally before writing.
+6. **Document.**
+   - *Memory:* load `references/templates.md` + `references/schema.md`; populate the split files per scale. Always include `Known Issues`, `Decisions`, `Tasks / Next Work`, `Gotchas`, `Agent Conflict Protocol`, and `Confidence Notes` unless the user asks for a minimal XS note.
+   - *Navigation:* the lead writes `_meta/domain-paths.json` + `_meta/conventions.md` first, then for ≥5 domains dispatches one writer subagent per domain (`references/subagent-orchestration.md` — read it before dispatching), then runs `scripts/lint_docs.py` and resolves flags, then writes `MAP.md`, `cross-cutting.md`, `_meta/last-verified.json`, and `_meta/links.json`. For <5 domains, write inline. Templates: `references/{map-template,domain-doc-template,cross-cutting-template,distributed-claude-md-template}.md`.
+7. **Cross-link** the two layers per the contract above (`links.json`, the MAP `## Project memory` section, the memory `## Linked Files` row, `nav_layer: agent-docs`).
+8. **Validate.** Run both via `python3 scripts/audit.py --project /path/to/project` (or each directly: `validate_context_map.py /path/.../context-map-<slug>` for memory, `lint_docs.py --root /path/to/project` for navigation). Fix output before reporting success — never claim completion with either failing.
+9. **Sustain.** Gitignore + agent rule + (M+) CI gate. See the Sustain section.
+10. **Verify.** Pick two questions an agent would realistically ask ("how does auth work end-to-end?", "where do I add an API route?"), start from `MAP.md`, follow the doc trail. If you read >3 files and still can't answer, the docs have a gap — fix it before finishing.
+11. **Conflict protocol.** If requested work conflicts with a known issue or decision, stop before editing code and ask the user (`references/decision-format.md` → `Agent Conflict Protocol`).
 
-```bash
-python3 scripts/validate_context_map.py /path/to/project/context-map-<slug>
-```
+## Sustain (maintenance discipline)
 
-10. If validation fails, fix the output before reporting success. Never claim completion with failing validation.
-11. Ensure the generated folder is gitignored. The skill never lets context-map content leak into a repo's history — it is project memory, not source code, and may carry private operational notes:
+The single biggest failure mode of agent docs is silent rot. Wire the layers so they don't drift:
 
-```bash
-# always: project-level rule (idempotent; touches only the project's .gitignore)
-python3 scripts/ensure_gitignore.py --scope project --project /path/to/project
+- **Memory:** `scripts/ensure_gitignore.py --scope project` (ignore `context-map-*/`, never `agent-docs/`) and `scripts/ensure_agent_rule.py` (unified two-layer stanza). The SessionStart hook surfaces a memory-staleness notice (it never auto-rewrites memory).
+- **Navigation — Policy C (default, ~99%):** copy `scripts/check_agent_docs_freshness.py` into the target's `scripts/`, generate the CI workflow and a pre-commit hook (`references/ci-gate-setup.md`), and document the `[skip-agent-docs]` escape hatch in root `CLAUDE.md`. Tell the user to add the CI job to required status checks.
+- **Navigation — Policy A (always):** the navigation half of the unified stanza ("update the domain doc in the same change").
+- **Navigation — Policy B (optional):** a Stop-hook reminder via `/update-config` (`references/hooks-setup.md`); always show the `settings.json` diff, never write it directly.
 
-# once per machine (skill offers this on first ever run, then skips):
-python3 scripts/ensure_gitignore.py --scope global
-```
+Mechanics for `update` / `audit` / `add-domain` and the `_meta/` schemas live in `references/maintenance-rules.md`.
 
-The global rule writes to the user's git excludes file (resolved via `core.excludesfile` → `$XDG_CONFIG_HOME/git/ignore` → `~/.config/git/ignore`) so every repo on the machine ignores `context-map-*/` even if its local `.gitignore` is missing the rule.
+## Reconcile
 
-12. Ensure agents know to read the context map first. Two mirror-image scripts handle this:
+For a project that already has both trees (or a legacy layout), `reconcile` detects, links, and unifies with **zero data loss** — it only adds files, adds lines via shown diffs, replaces content between managed markers (including the legacy memory-only stanza), and edits `.gitignore` additively. It never regenerates `decisions.md` / domain docs, never deletes, never reorders. Full step-by-step in `references/reconcile.md`.
 
-```bash
-# always: per-project agent stanza (CLAUDE.md or AGENTS.md in the project)
-python3 scripts/ensure_agent_rule.py --scope project --project /path/to/project
+## Batch And Dashboard
 
-# once per machine: global stanza in ~/.claude/CLAUDE.md
-python3 scripts/ensure_agent_rule.py --scope global
-```
-
-Both write a managed block delimited by `<!-- managed by context-map skill: BEGIN/END agent-rule -->` markers. Idempotent: re-running with unchanged content is a no-op; updating the stanza in this file (e.g. when the rule wording changes) replaces the block in place. Content outside the markers stays untouched. Always show the diff and ask before writing.
-
-13. If the requested work conflicts with a known issue or decision, stop before editing code and ask the user to confirm the change of direction. See `references/decision-format.md` → `Agent Conflict Protocol`.
-
-## Batch Workflow
-
-For `batch-*` modes:
-
-1. Load `~/.context-map/config.json` if it exists.
-2. Merge roots from config and the user's request.
-3. Run discovery:
-
-```bash
-python3 scripts/discover_projects.py --config ~/.context-map/config.json --format markdown
-```
-
-4. Show project candidates with numbers, path, scale, stack, context-map status (`none`, `v2`, `legacy`, `invalid`), and git status.
-5. Ask the user to choose numbers/ranges unless they explicitly requested all.
-6. For each selected project, run the single-project workflow and update/write its context map.
-7. Refresh the dashboard index:
-
-```bash
-python3 scripts/collect_context_maps.py --config ~/.context-map/config.json --output ~/.context-map/index.json
-```
-
-If a batch is large, split it into chunks of 3–5 projects and report progress after each chunk.
+For `batch-*` and `dashboard-data`, read `references/batch-workflow.md` and `references/dashboard-data.md`. Config: `~/.context-map/config.json`. Dashboard index: `~/.context-map/index.json`. Show discovered candidates and let the user choose before writing. Process selected projects as a queue; write durable progress after each.
 
 ## Where To Write
 
-- Existing `context-map-<slug>/` folder: update files in place.
-- No map yet: create `context-map-<slug>/` at project root, with the split files required by the project's scale.
-- Legacy `context-map.md` or `docs/context-map.md` detected: run `migrate-legacy` (do not silently overwrite).
+- Existing `context-map-<slug>/` and/or `agent-docs/`: update in place (or `reconcile` if unlinked).
+- Nothing yet: create the memory tree at the root (split files per scale) and, at M+ or on request, the navigation tree.
+- Legacy single-file map detected: run `migrate-legacy` (do not silently overwrite).
 
-Do not include secrets, private tokens, passwords, API keys, or live credentials. Reference secret-holding file paths only if useful and safe.
-
-## Required Sections
-
-See `references/schema.md` → `Required Sections By File` for the authoritative matrix. In short, every project above XS needs: identity, current phase, tech stack, read-first routing, architecture overview, known issues, decisions, tasks, gotchas, agent conflict protocol, confidence notes, validation checklist, update protocol.
-
-See also:
-
-- `references/schema.md` for every canonical table and field.
-- `references/templates.md` for per-file templates keyed to scale.
-- `references/heuristics.md` for scale detection.
-- `references/decision-format.md` for `Known Issues`, `Decisions`, and conflict protocol details.
-- `references/first-run.md` for onboarding, `.gitignore`, agent-file integration.
-- `references/batch-workflow.md` for multi-project discovery and queueing.
-- `references/dashboard-data.md` for frontmatter and index JSON shape.
-- `references/quality-check.md` for final validation.
+Do not include secrets, tokens, passwords, or live credentials in either layer. Reference secret-holding file paths only if useful and safe.
 
 ## Update Rules
 
-When updating an existing map:
+- Preserve accurate manual notes. Skill-managed tables/stanzas are idempotent; hand-written commentary (memory prose between sections; the navigation `## Notes` section) must survive.
+- Remove or mark stale claims when code/docs contradict them; add a `Confidence Notes` row for each contradiction.
+- Prefer adding a new decision over silently rewriting project history. Keep a fixed known issue if future agents might repeat it (status `fixed` + regression rule).
+- Keep `context-map.md` and `MAP.md` concise routers. Deep memory detail → `architecture.md`; deep navigation detail → the domain doc.
+- Bump `last_updated` and `last_verified_vs_code` (memory) and `_meta/last-verified.json` (navigation) on every run.
 
-- Preserve accurate manual notes. The stanzas and tables touched by the skill are idempotent where possible; hand-written commentary between sections must survive.
-- Remove or mark stale claims when code/docs contradict them; add a row to `Confidence Notes` for each contradiction.
-- Prefer adding a new decision over silently rewriting project history.
-- If a known issue was fixed, keep it when future agents might repeat the mistake; mark status `fixed` and add the regression rule.
-- Keep `context-map.md` concise. Move deep details into `architecture.md` or `domains/*.md`.
-- Bump `last_updated` and `last_verified_vs_code` on every run.
+## Reference Files
+
+Memory layer: `schema.md` (authoritative, both layers), `templates.md`, `heuristics.md` (scale + domain decomposition), `first-run.md`, `decision-format.md`, `quality-check.md`, `batch-workflow.md`, `dashboard-data.md`.
+
+Navigation layer: `map-template.md`, `domain-doc-template.md`, `cross-cutting-template.md`, `distributed-claude-md-template.md`, `root-claude-md-stanza.md`, `subagent-orchestration.md` (read before dispatching writers), `maintenance-rules.md`, `ci-gate-setup.md`, `hooks-setup.md`.
+
+Reconcile: `reconcile.md`.
+
+Scripts: `inspect_project.py`, `validate_context_map.py` (memory), `lint_docs.py` (navigation), `audit.py` (runs both, one report), `check_agent_docs_freshness.py` (CI gate template), `ensure_gitignore.py`, `ensure_agent_rule.py`, `reconcile.py`, `discover_projects.py`, `collect_context_maps.py`, `migrate_legacy.py`.

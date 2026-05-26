@@ -424,6 +424,65 @@ def extract_doc_drift(root: Path, files: list[Path]) -> list[dict[str, Any]]:
     return drift
 
 
+# Directories that are containers, not domains — expand to their children.
+_CONTAINER_DIRS = {"apps", "packages", "services", "modules", "libs", "crates"}
+# Directories that are tooling/noise, never a domain on their own.
+_NON_DOMAIN_DIRS = {
+    "node_modules", ".git", "dist", "build", ".next", "out", "target", "vendor",
+    ".venv", "venv", "__pycache__", ".turbo", "coverage", ".cache", "tmp",
+    "tests", "test", "__tests__", "fixtures", "e2e",
+}
+
+
+def derive_domain_candidates(root: Path, files: list[Path], git: dict[str, Any] | None) -> list[dict[str, Any]]:
+    """Propose navigation-layer domain candidates from the file tree + churn.
+
+    These are SEED suggestions for the skill's Decompose phase — the human
+    edits/accepts them. Each candidate clusters a directory (expanding monorepo
+    containers like apps/ and packages/ to their children) with its source-file
+    count and recent churn, so the largest/most-active areas surface first.
+    Returns up to ~14 candidates ranked by source count.
+    """
+    source = [p for p in files if p.suffix.lower() in SOURCE_EXTENSIONS]
+    if not source:
+        return []
+
+    # churn touches per top-level dir, for ranking/rationale
+    churn_by_top: dict[str, int] = {}
+    if git:
+        for item in git.get("top_churn_dirs", []):
+            churn_by_top[item.get("dir", "")] = item.get("touches", 0)
+
+    # Count source files per candidate root.
+    counts: Counter[str] = Counter()
+    for p in source:
+        parts = p.relative_to(root).parts
+        if not parts or len(parts) < 2:
+            continue  # top-level loose files aren't a domain
+        top = parts[0]
+        if top in _NON_DOMAIN_DIRS or top.startswith("."):
+            continue
+        if top in _CONTAINER_DIRS and len(parts) >= 3:
+            # expand: apps/web/..., packages/ui/... -> "apps/web", "packages/ui"
+            counts[f"{top}/{parts[1]}"] += 1
+        else:
+            counts[top] += 1
+
+    candidates: list[dict[str, Any]] = []
+    for root_path, n in counts.most_common(14):
+        if n < 2:
+            continue
+        top = root_path.split("/", 1)[0]
+        candidates.append({
+            "suggested_name": root_path.replace("/", "-"),
+            "roots": [root_path],
+            "source_files": n,
+            "churn_touches": churn_by_top.get(top, 0),
+            "why": "high churn" if churn_by_top.get(top, 0) >= 10 else "size",
+        })
+    return candidates
+
+
 def classify_scale(source_count: int, stacks: list[str], files: list[Path], root: Path) -> str:
     rels = {rel(p, root) for p in files}
     has_prod_signal = any(
@@ -454,6 +513,7 @@ def inspect(root: Path, largest_limit: int, todo_limit: int) -> dict[str, Any]:
     docs = find_docs(root, files)
     decision_docs = [p for p in docs if any(t in p.lower() for t in ["decision", "adr"])]
     known_issue_docs = [p for p in docs if any(t in p.lower() for t in ["known", "troubleshoot", "fixed-error"])]
+    git = extract_git_signals(root)
 
     return {
         "root": str(root),
@@ -471,8 +531,9 @@ def inspect(root: Path, largest_limit: int, todo_limit: int) -> dict[str, Any]:
         "known_issue_docs": known_issue_docs,
         "largest_files": [asdict(info) for info in find_largest_files(root, files, largest_limit)],
         "todo_hits": find_todos(root, files, todo_limit),
-        "git": extract_git_signals(root),
+        "git": git,
         "drift_candidates": extract_doc_drift(root, files),
+        "domain_candidates": derive_domain_candidates(root, files, git),
     }
 
 
@@ -521,6 +582,23 @@ def markdown_report(data: dict[str, Any]) -> str:
             lines.append(f"| `{item['path']}` | {item['lines']} | {item['bytes']} |")
     else:
         lines.append("- None found")
+    lines.append("")
+
+    lines.append("## Domain Candidates (navigation layer seed)")
+    lines.append("")
+    if data.get("domain_candidates"):
+        lines.append("| Suggested domain | Roots | Source files | Churn | Why |")
+        lines.append("|------------------|-------|--------------|-------|-----|")
+        for item in data["domain_candidates"]:
+            roots = ", ".join(f"`{r}`" for r in item["roots"])
+            lines.append(
+                f"| {item['suggested_name']} | {roots} | {item['source_files']} "
+                f"| {item['churn_touches']} | {item['why']} |"
+            )
+        lines.append("")
+        lines.append("_Seed suggestions — the skill's Decompose phase edits/confirms these with the user._")
+    else:
+        lines.append("- None (too small for the navigation layer; memory layer only)")
     lines.append("")
 
     lines.append("## TODO / FIXME / HACK")

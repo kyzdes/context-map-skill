@@ -154,6 +154,66 @@ def parse_split_file(folder: Path, filename: str, heading: str) -> tuple[list[di
     return rows, None
 
 
+_ISO_DATE_RE = re.compile(r"(\d{4}-\d{2}-\d{2})")
+
+
+def parse_nav_layer(project_root: Path) -> dict[str, Any]:
+    """Summarize the committed navigation layer (agent-docs/) for the dashboard."""
+    nav = project_root / "agent-docs"
+    if not (nav / "MAP.md").exists():
+        return {"has_agent_docs": False}
+
+    domains_dir = nav / "domains"
+    domain_count = len(list(domains_dir.glob("*.md"))) if domains_dir.is_dir() else 0
+
+    dated: list[tuple[str, str]] = []  # (YYYY-MM-DD, doc)
+    lv = nav / "_meta" / "last-verified.json"
+    if lv.exists():
+        try:
+            data = json.loads(_safe_read(lv))
+            # Two shapes are tolerated: a flat {doc: ...} map, or a wrapper
+            # {generated_at, commit, docs: {doc: ...}}. Only per-doc entries
+            # (keys containing ".md") count — skip metadata keys.
+            entries = data.get("docs") if isinstance(data, dict) and isinstance(data.get("docs"), dict) else data
+            if isinstance(entries, dict):
+                for doc, val in entries.items():
+                    if ".md" not in doc:
+                        continue
+                    raw = ""
+                    if isinstance(val, dict):
+                        raw = str(val.get("verified_at") or val.get("date") or val.get("last_verified") or "")
+                    elif isinstance(val, str):
+                        raw = val
+                    m = _ISO_DATE_RE.match(raw)
+                    if m:
+                        dated.append((m.group(1), doc))
+            # wrapper with a single generated_at and no per-doc dates
+            if not dated and isinstance(data, dict):
+                m = _ISO_DATE_RE.match(str(data.get("generated_at") or ""))
+                if m:
+                    dated.append((m.group(1), "agent-docs"))
+        except (json.JSONDecodeError, ValueError):
+            pass
+    if not dated:
+        m = re.search(r"\*\*Last verified\*\*:\s*(\d{4}-\d{2}-\d{2})", _safe_read(nav / "MAP.md"))
+        if m:
+            dated.append((m.group(1), "MAP.md"))
+
+    stalest = min(dated) if dated else None
+    gate_installed = (
+        (project_root / ".github" / "workflows" / "agent-docs-gate.yml").exists()
+        or (project_root / "scripts" / "check_agent_docs_freshness.py").exists()
+    )
+    return {
+        "has_agent_docs": True,
+        "domain_count": domain_count,
+        "stalest_domain": stalest[1] if stalest else None,
+        "stalest_date": stalest[0] if stalest else None,
+        "gate_installed": gate_installed,
+        "linked": (nav / "_meta" / "links.json").exists(),
+    }
+
+
 def parse_context_map_folder(folder: Path, project_path: Path | None = None) -> dict[str, Any]:
     main_file = folder / "context-map.md"
     warnings: list[str] = []
@@ -175,8 +235,8 @@ def parse_context_map_folder(folder: Path, project_path: Path | None = None) -> 
     text = _safe_read(main_file)
     frontmatter, body = parse_frontmatter(text)
 
-    if int(frontmatter.get("context_map_version") or 0) != 2:
-        warnings.append("context_map_version != 2")
+    if int(frontmatter.get("context_map_version") or 0) not in (2, 3):
+        warnings.append("context_map_version not in (2, 3)")
 
     known_issues, ki_warn = parse_split_file(folder, "known-issues.md", "Known Issues")
     if ki_warn:
@@ -300,7 +360,7 @@ def collect(projects: list[dict[str, Any]]) -> list[dict[str, Any]]:
         status = project.get("context_map_status")
         project_path = Path(project["path"])
 
-        if status == "v2" and project.get("context_map_folder"):
+        if status in ("v2", "v3") and project.get("context_map_folder"):
             parsed = parse_context_map_folder(Path(project["context_map_folder"]), project_path)
         elif status == "invalid" and project.get("context_map_folder"):
             parsed = parse_context_map_folder(Path(project["context_map_folder"]), project_path)
@@ -317,6 +377,9 @@ def collect(projects: list[dict[str, Any]]) -> list[dict[str, Any]]:
             parsed["scale"] = project.get("scale", "")
         if not parsed.get("stack"):
             parsed["stack"] = project.get("stacks", [])
+
+        # Navigation-layer summary (committed agent-docs/), independent of memory state.
+        parsed["nav"] = parse_nav_layer(project_path)
 
         rows.append(parsed)
     return rows
@@ -346,10 +409,20 @@ def main() -> int:
 
     discovered = discover_roots(roots, args.max_depth, legacy_names, folder_pattern)
     projects = collect(discovered)
+
+    nav_projects = [p for p in projects if p.get("nav", {}).get("has_agent_docs")]
+    nav_freshness = {
+        "projects_with_nav": len(nav_projects),
+        "total_domains": sum(p["nav"].get("domain_count", 0) for p in nav_projects),
+        "gate_installed": sum(1 for p in nav_projects if p["nav"].get("gate_installed")),
+        "linked_to_memory": sum(1 for p in nav_projects if p["nav"].get("linked")),
+    }
+
     payload = {
-        "version": 2,
+        "version": 3,
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "roots": [str(root) for root in roots],
+        "nav_freshness": nav_freshness,
         "projects": projects,
     }
 

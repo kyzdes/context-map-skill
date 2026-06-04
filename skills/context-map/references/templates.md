@@ -6,6 +6,17 @@ All templates below define the content of individual files inside the **memory l
 
 Pick the variant per file by project scale (see `references/schema.md` → `File Presence By Scale`). When a section is marked optional, include it only when the project has signal worth recording.
 
+## Contents
+
+- [Shared Rules](#shared-rules)
+- [`context-map.md`](#context-mapmd) — main router, with **XS** / **S·M** / **L** / **XL** variants
+- [`known-issues.md`](#known-issuesmd)
+- [`decisions.md`](#decisionsmd)
+- [`tasks.md`](#tasksmd)
+- [`gotchas.md`](#gotchasmd)
+- [`architecture.md`](#architecturemd)
+- [Per-domain docs → navigation layer](#per-domain-docs--navigation-layer)
+
 ## Shared Rules
 
 - Every `context-map.md` starts with the YAML frontmatter from `references/schema.md`.

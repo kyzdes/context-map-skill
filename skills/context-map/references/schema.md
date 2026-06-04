@@ -4,6 +4,17 @@ Single source of truth for frontmatter, table columns, enums, ID formats, requir
 
 If anything in another file conflicts with this schema, this file wins. Fix the other file.
 
+## Contents
+
+- [Two Layers](#two-layers) — memory vs navigation
+- [Output Layout (memory layer)](#output-layout-memory-layer) — folder + file-presence-by-scale
+- [Frontmatter Schema](#frontmatter-schema) — fields, `nav_layer`, version
+- [Table Schemas](#table-schemas) — Known Issues / Decisions / Tasks / Gotchas / Tech Stack / etc.
+- [Required Sections By File](#required-sections-by-file)
+- [Parser Contract](#parser-contract)
+- [Navigation Layer](#navigation-layer) — `agent-docs/` layout, domain-doc headers, `_meta/*.json`
+- [Version History](#version-history)
+
 ## Two Layers
 
 The skill maintains two cross-linked trees at the project root:

@@ -1,0 +1,48 @@
+{
+  "skill_name": "context-map",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "This FastAPI + Next.js monorepo is getting too big — my agent keeps loading the wrong files and running out of context. Decompose it into per-domain docs so it only reads the slice it needs, and add a check that keeps them fresh.",
+      "expected_output": "Discover + Decompose (propose domains, confirm with user), generate a committed agent-docs/ navigation tree (MAP.md + domains/*.md + _meta/), wire the Policy C CI freshness gate (check_agent_docs_freshness.py). Offers the gitignored memory layer too. Runs lint_docs.py and reports clean.",
+      "files": [],
+      "expectations": [
+        "A committed agent-docs/ tree is created with MAP.md, domains/*.md, and _meta/",
+        "The proposed domain list is shown to the user for confirmation before any domain doc is written (decompose is not silent)",
+        "A Policy C CI freshness gate is wired by placing check_agent_docs_freshness.py in the target and generating a CI workflow / pre-commit hook",
+        "A [skip-agent-docs] escape hatch is documented in the root CLAUDE.md",
+        "lint_docs.py is run and reported clean before completion is claimed",
+        "The gitignored memory layer is offered rather than silently skipped"
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "Set up a context map for this repo so future Claude sessions remember the decisions we made and the known issues, and stop re-litigating them every time.",
+      "expected_output": "Generate the gitignored memory layer context-map-<slug>/ (context-map.md + decisions.md + known-issues.md + tasks.md + gotchas.md per scale), gitignore it via ensure_gitignore.py, add the unified CLAUDE.md stanza via ensure_agent_rule.py, validate with validate_context_map.py. English output regardless of chat language.",
+      "files": [],
+      "expectations": [
+        "A context-map-<slug>/ memory tree is created at the repo root",
+        "It contains context-map.md, decisions.md, known-issues.md, tasks.md, and gotchas.md (subject to project scale)",
+        "ensure_gitignore.py adds the context-map-*/ ignore rule so the memory tree is never committed",
+        "A unified agent-rule stanza is added to CLAUDE.md/AGENTS.md via ensure_agent_rule.py behind an explicit diff and approval",
+        "validate_context_map.py passes on the generated folder before completion is claimed",
+        "All generated files are written in English even when the conversation is in another language"
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "This project already has both an agent-docs/ folder and a context-map-billing/ folder but they aren't linked and the CLAUDE.md stanza looks old. Can you connect them without losing anything?",
+      "expected_output": "reconcile mode: detect the split layout, write _meta/links.json, add the ../agent-docs/MAP.md cross-link to memory context-map.md, bump frontmatter to v3 (+nav_layer), replace the legacy CLAUDE.md stanza, fix the project .gitignore, and warn (with git rm --cached) if the memory folder is already tracked. Zero data loss; shows diffs.",
+      "files": [],
+      "expectations": [
+        "Operates in reconcile mode: detects the existing split layout instead of regenerating it",
+        "Writes _meta/links.json pairing the navigation and memory trees",
+        "Adds the ../agent-docs/MAP.md cross-link into the memory context-map.md and sets nav_layer in frontmatter",
+        "Bumps the memory frontmatter to context_map_version 3",
+        "Replaces the legacy CLAUDE.md stanza between managed markers without leaving a duplicate stanza",
+        "Does not regenerate, delete, or reorder existing decisions.md or domain docs — changes are additive and shown as diffs",
+        "If the memory folder is already git-tracked, warns and prints the git rm -r --cached command rather than running it"
+      ]
+    }
+  ]
+}

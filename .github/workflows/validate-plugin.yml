@@ -63,3 +63,10 @@ jobs:
           if failed:
               sys.exit(1)
           PY
+
+      - name: scripts compile + regression test suite
+        run: |
+          set -e
+          python3 -m py_compile skills/context-map/scripts/*.py
+          echo "ok: all scripts compile"
+          python3 skills/context-map/tests/test_skill.py

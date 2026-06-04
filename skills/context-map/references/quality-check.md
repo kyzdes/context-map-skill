@@ -44,7 +44,7 @@ Must be true before reporting success:
 - `Known Issues`, `Decisions`, and `Tasks / Next Work` are populated when evidence exists; if empty, prefer one row explaining why rather than an empty table.
 - Commands in `Run / Test`, `Local Development`, `Deployment` are copy-pasteable and match the repo.
 - No secrets, live tokens, passwords, or private keys appear anywhere.
-- Root `context-map.md` remains concise. For L/XL projects, deep detail lives in `architecture.md` or `domains/*.md`.
+- Root `context-map.md` remains concise. For L/XL projects, deep operational detail lives in `architecture.md`; per-domain navigation lives in the navigation layer (`agent-docs/domains/*.md`).
 
 ## Good Traits
 
@@ -65,7 +65,7 @@ Must be true before reporting success:
 - Using stale git history as the main status signal; the `Current Phase` block is agg signals, not a commit log.
 - Secret values, live tokens, passwords, private keys.
 - Oversized map for an XS/S project.
-- One root file over 600 lines for an L/XL project — split into `architecture.md` or `domains/*.md`.
+- One root file over 600 lines for an L/XL project — split operational detail into `architecture.md`; move per-domain docs to the navigation layer (`agent-docs/domains/*.md`).
 - Duplicating schema definitions locally instead of referencing `references/schema.md`.
 
 ## Final Audit Questions

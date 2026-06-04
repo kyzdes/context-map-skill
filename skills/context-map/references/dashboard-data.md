@@ -4,13 +4,13 @@ Use this when preparing context maps and indexes for the future local web dashbo
 
 ## Frontmatter
 
-Every `context-map.md` starts with the YAML frontmatter defined in `references/schema.md` → `Frontmatter Schema`. Split files (`known-issues.md`, `decisions.md`, `tasks.md`, `gotchas.md`, `architecture.md`, `domains/*.md`) have no frontmatter — they are parsed only via the main file's index.
+Every `context-map.md` starts with the YAML frontmatter defined in `references/schema.md` → `Frontmatter Schema`. Split files (`known-issues.md`, `decisions.md`, `tasks.md`, `gotchas.md`, `architecture.md`) have no frontmatter — they are parsed only via the main file's index.
 
 Example:
 
 ```yaml
 ---
-context_map_version: 2
+context_map_version: 3
 project_id: multi-resume
 project_slug: multi-resume
 name: "Super Resume"
@@ -20,13 +20,45 @@ visibility: private
 status: active
 scale: M
 primary_stack: [Python, FastAPI, Docker]
+nav_layer: agent-docs
 last_updated: 2026-04-22
 last_verified_vs_code: 2026-04-22
-generator: context-map-skill/0.2
+generator: context-map-skill/0.3
 ---
 ```
 
 See `references/schema.md` for field-level rules, enums, and types. Do not add custom fields; the dashboard ignores them.
+
+## Navigation layer (index v3)
+
+`collect_context_maps.py` writes `index.json` at **version 3**. Each project row carries a `nav` block summarizing the committed navigation layer, and the index has a top-level `nav_freshness` rollup.
+
+```jsonc
+{
+  "version": 3,
+  "nav_freshness": {
+    "projects_with_nav": 4,      // projects that have agent-docs/MAP.md
+    "total_domains": 38,
+    "gate_installed": 2,         // have the CI freshness gate wired
+    "linked_to_memory": 3        // have agent-docs/_meta/links.json
+  },
+  "projects": [
+    {
+      "project_id": "manaurum",
+      "nav": {
+        "has_agent_docs": true,
+        "domain_count": 11,
+        "stalest_domain": "domains/backend-api.md",
+        "stalest_date": "2026-05-15",
+        "gate_installed": false,
+        "linked": false
+      }
+    }
+  ]
+}
+```
+
+`nav.has_agent_docs` is `false` for memory-only projects (the rest of the `nav` block is then omitted). Dates come from `agent-docs/_meta/last-verified.json` (the `{generated_at, commit, docs: {...}}` shape), falling back to the `**Last verified**` line in `MAP.md`.
 
 ## Parseable Sections
 

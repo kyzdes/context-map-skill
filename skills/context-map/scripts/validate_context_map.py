@@ -32,7 +32,7 @@ from collect_context_maps import (  # noqa: E402
 # ---- Schema ---------------------------------------------------------------
 
 REQUIRED_FRONTMATTER: dict[str, dict[str, Any]] = {
-    "context_map_version": {"type": "int", "equals": 2},
+    "context_map_version": {"type": "int", "in": [2, 3]},
     "project_id": {"type": "slug"},
     "project_slug": {"type": "slug"},
     "name": {"type": "str"},
@@ -216,6 +216,8 @@ def _validate_frontmatter(folder: Path, frontmatter: dict[str, Any], report: Rep
                 continue
             if "equals" in spec and parsed != spec["equals"]:
                 report.err(f"frontmatter: '{field}' must equal {spec['equals']}, got {parsed}")
+            if "in" in spec and parsed not in spec["in"]:
+                report.err(f"frontmatter: '{field}' must be one of {spec['in']}, got {parsed}")
 
         elif kind == "slug":
             if not isinstance(value, str) or not SLUG_RE.match(value):
@@ -243,6 +245,15 @@ def _validate_frontmatter(folder: Path, frontmatter: dict[str, Any], report: Rep
                 report.err(f"frontmatter: '{field}' must be YYYY-MM-DD, got {value!r}")
             elif parsed_date > date.today():
                 report.warn(f"frontmatter: '{field}' is in the future ({value})")
+
+    # nav_layer: required by schema v3, tolerated-if-absent for v2 maps.
+    nav_layer = frontmatter.get("nav_layer", "__absent__")
+    version = frontmatter.get("context_map_version")
+    if nav_layer == "__absent__":
+        if str(version) == "3":
+            report.warn("frontmatter: 'nav_layer' missing (schema 3 expects `agent-docs` or `null`)")
+    elif nav_layer not in (None, "", "agent-docs", "null"):
+        report.err(f"frontmatter: 'nav_layer' must be 'agent-docs' or null, got {nav_layer!r}")
 
     expected_slug_from_folder = folder.name.removeprefix("context-map-")
     if frontmatter.get("project_slug") and frontmatter["project_slug"] != expected_slug_from_folder:

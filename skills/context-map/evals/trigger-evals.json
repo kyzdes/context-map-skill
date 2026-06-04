@@ -1,0 +1,22 @@
+[
+  {"query": "my agent keeps getting lost in this ~180k-line monorepo and loading the wrong files — can you split the project into per-domain docs so it only reads what it needs?", "should_trigger": true},
+  {"query": "set up a context map for ~/Desktop/Projects/finance-app so future Claude sessions remember the decisions and known issues and stop re-litigating them", "should_trigger": true},
+  {"query": "разложи проект по доменам, агенты постоянно теряются в коде и жрут токены на загрузку лишнего", "should_trigger": true},
+  {"query": "create agent-docs with a MAP and per-folder CLAUDE.md for our next.js + fastapi monorepo, plus a CI gate so the docs dont rot", "should_trigger": true},
+  {"query": "сделай карту проекта и память для агента в этом репозитории", "should_trigger": true},
+  {"query": "this repo already has agent-docs/ and context-map-billing/ but theyre not linked, can you reconcile them without losing anything", "should_trigger": true},
+  {"query": "i want to record known issues and gotchas so the next dev human or AI doesnt repeat that port 5000 airplay bug on mac again", "should_trigger": true},
+  {"query": "audit our agent-docs/ — pretty sure half the domain docs went stale after last week's refactor", "should_trigger": true},
+  {"query": "onboarding map for AI agents working on this codebase, organized by layer/domain", "should_trigger": true},
+  {"query": "we make the same architecture decisions over and over with the assistant. need a persistent decisions + do-not-repeat log for the project", "should_trigger": true},
+  {"query": "write a nice README.md for this open-source library explaining install and usage for new contributors", "should_trigger": false},
+  {"query": "set up a vector database with embeddings / RAG over our source code so the agent can semantically search the repo", "should_trigger": false},
+  {"query": "generate customer-facing API reference docs from our OpenAPI spec and publish them to our docs site", "should_trigger": false},
+  {"query": "draw a mermaid architecture diagram of our microservices and how they talk to each other", "should_trigger": false},
+  {"query": "review my CLAUDE.md and suggest improvements to the coding conventions and lint rules", "should_trigger": false},
+  {"query": "explain how the auth module in backend/app/auth/context.py works end to end", "should_trigger": false},
+  {"query": "i need a map screen for my travel app showing the user's saved cities with pins", "should_trigger": false},
+  {"query": "put together a Q3 project plan with milestones and a gantt chart for the team", "should_trigger": false},
+  {"query": "extract every TODO and FIXME comment from the codebase into a markdown checklist", "should_trigger": false},
+  {"query": "summarize the decisions from this product meeting transcript into action items", "should_trigger": false}
+]

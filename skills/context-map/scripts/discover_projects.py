@@ -133,7 +133,7 @@ def find_context_map_folder(path: Path, pattern: str = CONTEXT_MAP_FOLDER_PATTER
         version = _parse_frontmatter_version(main_file)
         last_updated = _parse_frontmatter_field(main_file, "last_updated")
         last_verified = _parse_frontmatter_field(main_file, "last_verified_vs_code")
-        status = "v2" if version == 2 else "invalid"
+        status = f"v{version}" if version in (2, 3) else "invalid"
         return {
             "folder": str(child),
             "main": str(main_file),
@@ -308,7 +308,7 @@ def markdown(rows: list[dict[str, Any]], roots: list[Path]) -> str:
         markers = ", ".join(row["markers"])
 
         status = row["context_map_status"]
-        if status == "v2":
+        if status in ("v2", "v3"):
             extras = []
             if row.get("last_verified_vs_code"):
                 extras.append(f"last_verified {row['last_verified_vs_code']}")

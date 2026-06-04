@@ -89,7 +89,7 @@ Avoid nested duplicates:
 | Status | Meaning |
 |--------|---------|
 | `none` | no folder matching `context-map-*/` and no legacy file |
-| `v2` | folder exists, `context-map.md` has `context_map_version: 2` frontmatter |
+| `v2` / `v3` | folder exists, `context-map.md` has `context_map_version: 2` or `3` frontmatter (valid) |
 | `legacy` | only a legacy single-file `context-map.md` / `docs/context-map.md` exists |
 | `invalid` | folder exists but `validate_context_map.py` reports errors |
 
